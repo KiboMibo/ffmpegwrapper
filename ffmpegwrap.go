@@ -1,4 +1,4 @@
-package goFFmpegWrapper
+package ffmpegwrapper
 
 import (
 	"os/exec"
@@ -52,11 +52,11 @@ func (m *MediaFile) Convert(outFileName string, args string) (chan string, error
 	// default arg is answer yes to rewrite file
 	// show only errors and converting status
 	var cmdArgs = []string{"-y", "-v", "error", "-stats", "-i", m.Filename}
-	if len(args) > 0 {
+	argsSlice := strings.Split(args, " ")
+	if len(argsSlice) > 0 && argsSlice[0] != " " {
 		cmdArgs = append(cmdArgs, strings.Split(args, " ")...)
 	}
 	cmdArgs = append(cmdArgs, outPath)
-
 	cmd := exec.Command(cmdName, cmdArgs...)
 
 	cmdReader, err := cmd.StderrPipe()
@@ -82,11 +82,10 @@ func (m *MediaFile) Convert(outFileName string, args string) (chan string, error
 			// Coz output readed by changing words, so we need join words to get normal status string
 			if strings.Contains(w, "="){
 				tmpValString := strings.Split(w, "=")
+				fullVal = w
 				if len(tmpValString) > 1 && tmpValString[1] == ""{
-					fullVal = w
 					continue
 				}
-				fullVal = w
 			} else {
 				fullVal = fullVal + w
 			}
@@ -114,7 +113,6 @@ func (m *MediaFile) Convert(outFileName string, args string) (chan string, error
 
 	return outChan, nil
 }
-
 
 // getExistingPath ensures a path actually exists, and returns an existing absolute path or an error.
 func getExistingPath(path string) (existingPath string, err error) {

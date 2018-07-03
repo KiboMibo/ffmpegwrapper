@@ -1,4 +1,4 @@
-package goFFmpegWrapper
+package ffmpegwrapper
 
 type Metadata struct {
 	Streams                 []Streams     `json:"streams"`

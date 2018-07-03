@@ -1,4 +1,4 @@
-package goFFmpegWrapper
+package ffmpegwrapper
 
 import (
 	"testing"
@@ -13,12 +13,15 @@ func Test(t *testing.T) {
 		return
 	}
 
-	ffmpParams := "-crf 20 -bufsize 4096k -vf scale=1280:800:force_original_aspect_ratio=decrease"
-	if out, err := m.Convert("pre_test.mov", ffmpParams); err != nil{
+	fmt.Println(m.Info.Streams[0].CodecType)
+
+	ffmpParams := "-ss 00:00:01 -vframes 1 -q:v 2 -vf scale=1280:-1"
+	if out, err := m.Convert("pre_test.jpg", ffmpParams); err != nil{
 		t.Errorf("Failed convert file : %s", err)
 	} else {
 		for msg := range out {
 		   fmt.Println(msg)
 		}
 	}
+
 }

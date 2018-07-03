@@ -35,7 +35,7 @@ Defaults for ffmpeg command:
 ```go
 func main(){
      // Initialize
-     m, err := NewMediaFile("./test/test.MOV")
+     m, err := ffmpegwraper.NewMediaFile("./test/test.MOV")
      if err != nil {
         panic(fmt.Errorf("Failed get file info : %s", err))
      }
