@@ -13,8 +13,6 @@ func Test(t *testing.T) {
 		return
 	}
 
-	fmt.Println(m.Info.Streams[0].CodecType)
-
 	ffmpParams := "-ss 00:00:01 -vframes 1 -q:v 2 -vf scale=1280:-1"
 	if out, err := m.Convert("pre_test.jpg", ffmpParams); err != nil{
 		t.Errorf("Failed convert file : %s", err)
