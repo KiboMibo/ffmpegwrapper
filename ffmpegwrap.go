@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"bufio"
+	"bytes"
 )
 
 type MediaFile struct {
@@ -22,6 +23,10 @@ func (m *MediaFile) AnalyzeMetadata() (err error) {
 	cmdName, err := exec.LookPath("ffprobe")
 	if err != nil {
 		return errors.New("ffprobe is not installed")
+	}
+	if strings.ToLower(filepath.Ext(m.Filename)) == ".heic" {
+		fmt.Println("Found heic image no metadata with ffprobe will exported")
+		return
 	}
 	cmdArgs := fmt.Sprintf("-show_format -show_streams -pretty -print_format json -hide_banner -i %s", m.Filename)
 	out, err := exec.Command(cmdName, strings.Split(cmdArgs, " ")...).Output()
@@ -66,7 +71,7 @@ func (m *MediaFile) Convert(outFileName string, args string) (chan string, error
 	}
 	// make scanner to read changing output by words
 	scanner := bufio.NewScanner(cmdReader)
-	scanner.Split(bufio.ScanWords)
+	scanner.Split(ScanLines)
 	outChan := make(chan string)
 
 	go func() {
@@ -74,27 +79,8 @@ func (m *MediaFile) Convert(outFileName string, args string) (chan string, error
 			close(outChan)
 		}()
 
-		var fullVal string
-		var fullString []string
-
 		for scanner.Scan() {
-			w := scanner.Text()
-			// Coz output readed by changing words, so we need join words to get normal status string
-			if strings.Contains(w, "="){
-				tmpValString := strings.Split(w, "=")
-				fullVal = w
-				if len(tmpValString) > 1 && tmpValString[1] == ""{
-					continue
-				}
-			} else {
-				fullVal = fullVal + w
-			}
-			// Finally concatenate status string
-			fullString = append(fullString, fullVal)
-			if len(fullString) >= 7 {
-				outChan <- strings.Join(fullString, " ")
-				fullString = nil
-			}
+			outChan <- scanner.Text()
 		}
 	}()
 
@@ -142,4 +128,31 @@ func NewMediaFile(filename string) (mf *MediaFile, err error) {
 	mf = &MediaFile{Filename: filename, Info: &meta}
 	err = mf.AnalyzeMetadata()
 	return
+}
+
+// Modified ScanerLines from Bufio to check for \r command
+func ScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.IndexByte(data, '\n'); i >= 0 {
+		// We have a full newline-terminated line.
+		return i + 1, dropCR(data[0:i]), nil
+	}
+	if  j := bytes.IndexByte(data, '\r'); j >= 0 {
+		return j + 1, dropCR(data[0:j]), nil
+	}
+	// If we're at EOF, we have a final, non-terminated line. Return it.
+	if atEOF {
+		return len(data), dropCR(data), nil
+	}
+	// Request more data.
+	return 0, nil, nil
+}
+// From bufio too
+func dropCR(data []byte) []byte {
+	if len(data) > 0 && data[len(data)-1] == '\r' {
+		return data[0 : len(data)-1]
+	}
+	return data
 }
