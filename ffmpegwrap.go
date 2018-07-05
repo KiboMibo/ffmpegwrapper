@@ -10,6 +10,7 @@ import (
 	"strings"
 	"bufio"
 	"bytes"
+	"unicode"
 )
 
 type MediaFile struct {
@@ -25,8 +26,7 @@ func (m *MediaFile) AnalyzeMetadata() (err error) {
 		return errors.New("ffprobe is not installed")
 	}
 	if strings.ToLower(filepath.Ext(m.Filename)) == ".heic" {
-		fmt.Println("Found heic image no metadata with ffprobe will exported")
-		return
+		return errors.New("Found heic image no metadata with ffprobe will exported")
 	}
 	cmdArgs := fmt.Sprintf("-show_format -show_streams -pretty -print_format json -hide_banner -i %s", m.Filename)
 	out, err := exec.Command(cmdName, strings.Split(cmdArgs, " ")...).Output()
@@ -80,13 +80,14 @@ func (m *MediaFile) Convert(outFileName string, args string) (chan string, error
 		}()
 
 		for scanner.Scan() {
-			outChan <- scanner.Text()
+			outChan <- stripSpaces(scanner.Text())
 		}
 	}()
 
 	go func(){
 		err = cmd.Start()
 		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error start cmd", err)
 			return
 		}
 		outChan <- "Converting started"
@@ -135,6 +136,7 @@ func ScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
+
 	if i := bytes.IndexByte(data, '\n'); i >= 0 {
 		// We have a full newline-terminated line.
 		return i + 1, dropCR(data[0:i]), nil
@@ -142,6 +144,8 @@ func ScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if  j := bytes.IndexByte(data, '\r'); j >= 0 {
 		return j + 1, dropCR(data[0:j]), nil
 	}
+
+
 	// If we're at EOF, we have a final, non-terminated line. Return it.
 	if atEOF {
 		return len(data), dropCR(data), nil
@@ -155,4 +159,22 @@ func dropCR(data []byte) []byte {
 		return data[0 : len(data)-1]
 	}
 	return data
+}
+
+func stripSpaces(str string) string {
+	var prevChar rune
+	return strings.Map(func(r rune) rune {
+		// if the character is a space, and prevChar is space then drop it
+		if unicode.IsSpace(r) && unicode.IsSpace(prevChar) {
+			return -1
+		}
+		// icharacter is a space and precChar is "=" then drop it
+		if unicode.IsSpace(r) && prevChar == rune(61) {
+			return -1
+		}
+
+		prevChar = r
+		// else keep it in the string
+		return r
+	}, str)
 }
