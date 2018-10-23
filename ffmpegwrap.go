@@ -28,8 +28,9 @@ func (m *MediaFile) AnalyzeMetadata() (err error) {
 	if strings.ToLower(filepath.Ext(m.Filename)) == ".heic" {
 		return errors.New("Found heic image no metadata with ffprobe will exported")
 	}
-	cmdArgs := fmt.Sprintf("-show_format -show_streams -pretty -print_format json -hide_banner -i %s", m.Filename)
-	out, err := exec.Command(cmdName, strings.Split(cmdArgs, " ")...).Output()
+	cmdArgs := []string{"-show_format", "-show_streams", "-pretty", "-print_format", "json", "-hide_banner"}
+	cmdArgs = append(cmdArgs, []string{"-i", m.Filename}...)
+	out, err := exec.Command(cmdName, cmdArgs...).Output()
 	if err != nil {
 		fmt.Println(err)
 		return errors.New("Failed read metadata")
@@ -40,7 +41,7 @@ func (m *MediaFile) AnalyzeMetadata() (err error) {
 	return
 }
 // Convert checks that outFileName is abs path or put the output file in the same dir that original
-func (m *MediaFile) Convert(outFileName string, args string) (chan string, error){
+func (m *MediaFile) Convert(outFileName string, args []string) (chan string, error){
 	cmdName, err := exec.LookPath("ffmpeg")
 	if err != nil {
 		return nil, errors.New("ffmpeg is not installed")
@@ -57,13 +58,11 @@ func (m *MediaFile) Convert(outFileName string, args string) (chan string, error
 	// default arg is answer yes to rewrite file
 	// show only errors and converting status
 	var cmdArgs = []string{"-y", "-v", "error", "-stats", "-i", m.Filename}
-	argsSlice := strings.Split(args, " ")
-	if len(argsSlice) > 0 && argsSlice[0] != " " {
-		cmdArgs = append(cmdArgs, strings.Split(args, " ")...)
+	if len(args) > 0 && args[0] != " " {
+		cmdArgs = append(cmdArgs, args...)
 	}
 	cmdArgs = append(cmdArgs, outPath)
 	cmd := exec.Command(cmdName, cmdArgs...)
-
 	cmdReader, err := cmd.StderrPipe()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error creating StdoutPipe for Cmd", err)
@@ -144,7 +143,6 @@ func ScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if  j := bytes.IndexByte(data, '\r'); j >= 0 {
 		return j + 1, dropCR(data[0:j]), nil
 	}
-
 
 	// If we're at EOF, we have a final, non-terminated line. Return it.
 	if atEOF {
