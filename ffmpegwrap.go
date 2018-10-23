@@ -115,7 +115,7 @@ func getExistingPath(path string) (existingPath string, err error) {
 	// check root exists
 	_, err = os.Stat(existingPath)
 	return
-}
+}                                                                                                          
 
 // NewMediaFile initializes a MediaFile and parses its metadata with ffprobe.
 func NewMediaFile(filename string) (mf *MediaFile, err error) {
