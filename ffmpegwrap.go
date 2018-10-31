@@ -1,15 +1,15 @@
 package ffmpegwrapper
 
 import (
-	"os/exec"
+	"bufio"
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"encoding/json"
+	"os/exec"
 	"path/filepath"
 	"strings"
-	"bufio"
-	"bytes"
 	"unicode"
 )
 
@@ -17,7 +17,6 @@ type MediaFile struct {
 	Filename string
 	Info     *Metadata
 }
-
 
 // AnalyzeMetadata calls ffprobe on the file and parses its output to MedisaFile/Info structure.
 func (m *MediaFile) AnalyzeMetadata() (err error) {
@@ -36,12 +35,14 @@ func (m *MediaFile) AnalyzeMetadata() (err error) {
 		return errors.New("Failed read metadata")
 	}
 	if err := json.Unmarshal(out, m.Info); err != nil {
+		fmt.Println(err)
 		return errors.New("Failed unmarshal from JSON")
 	}
 	return
 }
+
 // Convert checks that outFileName is abs path or put the output file in the same dir that original
-func (m *MediaFile) Convert(outFileName string, args []string) (chan string, error){
+func (m *MediaFile) Convert(outFileName string, args []string) (chan string, error) {
 	cmdName, err := exec.LookPath("ffmpeg")
 	if err != nil {
 		return nil, errors.New("ffmpeg is not installed")
@@ -49,7 +50,7 @@ func (m *MediaFile) Convert(outFileName string, args []string) (chan string, err
 	// Check that out path is exist
 	outPath := filepath.Dir(outFileName)
 	_, err = os.Stat(outPath)
-	if os.IsNotExist(err) || !filepath.IsAbs(outPath){
+	if os.IsNotExist(err) || !filepath.IsAbs(outPath) {
 		outPath = filepath.Join(filepath.Dir(m.Filename), filepath.Base(outFileName))
 	} else {
 		outPath = outFileName
@@ -74,7 +75,7 @@ func (m *MediaFile) Convert(outFileName string, args []string) (chan string, err
 	outChan := make(chan string)
 
 	go func() {
-		defer func(){
+		defer func() {
 			close(outChan)
 		}()
 
@@ -83,7 +84,7 @@ func (m *MediaFile) Convert(outFileName string, args []string) (chan string, err
 		}
 	}()
 
-	go func(){
+	go func() {
 		err = cmd.Start()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error start cmd", err)
@@ -115,7 +116,7 @@ func getExistingPath(path string) (existingPath string, err error) {
 	// check root exists
 	_, err = os.Stat(existingPath)
 	return
-}                                                                                                          
+}
 
 // NewMediaFile initializes a MediaFile and parses its metadata with ffprobe.
 func NewMediaFile(filename string) (mf *MediaFile, err error) {
@@ -140,7 +141,7 @@ func ScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		// We have a full newline-terminated line.
 		return i + 1, dropCR(data[0:i]), nil
 	}
-	if  j := bytes.IndexByte(data, '\r'); j >= 0 {
+	if j := bytes.IndexByte(data, '\r'); j >= 0 {
 		return j + 1, dropCR(data[0:j]), nil
 	}
 
@@ -151,6 +152,7 @@ func ScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	// Request more data.
 	return 0, nil, nil
 }
+
 // From bufio too
 func dropCR(data []byte) []byte {
 	if len(data) > 0 && data[len(data)-1] == '\r' {
