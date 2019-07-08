@@ -4,8 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
+	"golang.org/x/xerrors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,21 +21,23 @@ type MediaFile struct {
 func (m *MediaFile) AnalyzeMetadata() (err error) {
 	cmdName, err := exec.LookPath("ffprobe")
 	if err != nil {
-		return errors.New("ffprobe is not installed")
+		err = xerrors.Errorf("FFprobe: %w", err)
+		return
 	}
 	if strings.ToLower(filepath.Ext(m.Filename)) == ".heic" {
-		return errors.New("Found heic image no metadata with ffprobe will exported")
+		return xerrors.New("Found heic image no metadata with ffprobe will exported")
 	}
 	cmdArgs := []string{"-show_format", "-show_streams", "-pretty", "-print_format", "json", "-hide_banner"}
 	cmdArgs = append(cmdArgs, []string{"-i", m.Filename}...)
 	out, err := exec.Command(cmdName, cmdArgs...).Output()
 	if err != nil {
-		fmt.Println(err)
-		return errors.New("Failed read metadata")
+		err = xerrors.Errorf("Analyze metadata: %w", err)
+		return
 	}
-	if err := json.Unmarshal(out, m.Info); err != nil {
-		fmt.Println(err)
-		return errors.New("Failed unmarshal from JSON")
+
+	if err = json.Unmarshal(out, m.Info); err != nil {
+		err = xerrors.Errorf("Metadata unmarshal: %w", err)
+		return
 	}
 	return
 }
@@ -45,7 +46,7 @@ func (m *MediaFile) AnalyzeMetadata() (err error) {
 func (m *MediaFile) Convert(outFileName string, args []string) (chan string, error) {
 	cmdName, err := exec.LookPath("ffmpeg")
 	if err != nil {
-		return nil, errors.New("ffmpeg is not installed")
+		return nil, xerrors.New("ffmpeg is not installed")
 	}
 	// Check that out path is exist
 	outPath := filepath.Dir(outFileName)
@@ -55,23 +56,34 @@ func (m *MediaFile) Convert(outFileName string, args []string) (chan string, err
 	} else {
 		outPath = outFileName
 	}
+
 	// Set ffmpeg defaults + user args
 	// default arg is answer yes to rewrite file
 	// show only errors and converting status
-	var cmdArgs = []string{"-y", "-v", "error", "-stats", "-i", m.Filename}
+	var cmdArgs []string
+
 	if len(args) > 0 && args[0] != " " {
+		//put -ss flag before input
+		if index := indexOf("-ss", args); index+1 > 0 {
+			cmdArgs = []string{"-y", "-v", "error", "-stats", args[index], args[index+1], "-i", m.Filename}
+			args = append(args[:index], args[index+2:]...)
+		} else {
+			cmdArgs = []string{"-y", "-v", "error", "-stats", "-i", m.Filename}
+		}
 		cmdArgs = append(cmdArgs, args...)
 	}
 	cmdArgs = append(cmdArgs, outPath)
+
+	//exec command
 	cmd := exec.Command(cmdName, cmdArgs...)
 	cmdReader, err := cmd.StderrPipe()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error creating StdoutPipe for Cmd", err)
+		err = xerrors.Errorf("Error creating StdoutPipe for Cmd: %w", err)
 		return nil, err
 	}
 	// make scanner to read changing output by words
 	scanner := bufio.NewScanner(cmdReader)
-	scanner.Split(ScanLines)
+	scanner.Split(scanLines)
 	outChan := make(chan string)
 
 	go func() {
@@ -87,13 +99,13 @@ func (m *MediaFile) Convert(outFileName string, args []string) (chan string, err
 	go func() {
 		err = cmd.Start()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error start cmd", err)
+			err = xerrors.Errorf("Error start cmd: %w", err)
 			return
 		}
 		outChan <- "Converting started"
 		err = cmd.Wait()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error waiting for Cmd", err)
+			err = xerrors.Errorf("Error waiting for Cmd %w", err)
 			return
 		}
 	}()
@@ -131,8 +143,8 @@ func NewMediaFile(filename string) (mf *MediaFile, err error) {
 	return
 }
 
-// Modified ScanerLines from Bufio to check for \r command
-func ScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
+// Modified ScanerLines from Bufio to check for \r
+func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
@@ -177,4 +189,13 @@ func stripSpaces(str string) string {
 		// else keep it in the string
 		return r
 	}, str)
+}
+
+func indexOf(element string, data []string) int {
+	for k, v := range data {
+		if element == v {
+			return k
+		}
+	}
+	return -1 //not found.
 }

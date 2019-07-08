@@ -43,8 +43,8 @@ func main(){
      fmt.Println(m.Info)
 
      // ffmpeg params
-     ffmpParams := "-crf 20 -bufsize 4096k -vf scale=1280:800:force_original_aspect_ratio=decrease"
-     out, err := m.Convert("pre_test.mov", ffmpParams);
+     ffmpParams := "-ss 00:01:30 -crf 20 -bufsize 4096k -vf scale=1280:800:force_original_aspect_ratio=decrease"
+     out, err := m.Convert("pre_test.mov", strings.Split(ffmpParams, " "));
      if err != nil{
      		panic(fmt.Errorf("Failed convert file : %s", err))
      }
@@ -54,3 +54,5 @@ func main(){
      }
 }
 ```
+
+```-ss``` flag with arg will be moved befote -i flag
