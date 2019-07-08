@@ -121,7 +121,7 @@ func getExistingPath(path string) (existingPath string, err error) {
 	} else {
 		pwd, err := os.Getwd()
 		if err != nil {
-			panic(err)
+			return "", xerrors.Errorf("Output file: %w", err)
 		}
 		existingPath = filepath.Join(pwd, path)
 	}
