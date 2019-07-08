@@ -1,4 +1,4 @@
-module github.com/ffmpegwrapper
+module github.com/KiboMibo/ffmpegwrapper
 
 go 1.12
 
